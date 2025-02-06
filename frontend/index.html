@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PharmaVision | Home</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='/styles.css') }}" />
+  <link rel="script" href="{{ url_for('static', filename='/main.js') }}">
+  <link rel="icon" href="{{url_for('static', filename='img/Header.png')}}" type="image/x-icon">
+
+
+</head>
+
+<body>
+  <div id="preloader"></div>
+
+  <div class="hero">
+    <div class="navbar-box">
+      <nav class="navbar">
+        <div class="logo">
+          <a href="#">PharmaVision</a>
+        </div>
+        <div class="navlinks">
+          <a href="/" class="navlink">Home</a>
+          <a href="/about" class="navlink">About Us</a>
+          <a href="/guide" class="navlink">How To Use</a>
+          <a href="/product" class="navlink">Products</a>
+          <a href="/contact" class="navlink">Contact</a>
+          <a href="/model" class="navlink">Model</a>
+          <a href="/chatbot" class="navlink">Chat</a>
+        </div>
+
+
+        <!-- <div>
+            <button class="nav-button" onclick="openDialog()">Upload</button>
+          </div> -->
+      </nav>
+    </div>
+
+    <div class="header">
+      <div class="headerFlex">
+        <h1>Know Your Medicine By Using <span>PharmaVision</span></h1>
+        <p>
+          An innovative AI-powered system for medicine detection and
+          information retrieval uses image recognition to identify medications
+          swiftly and accurately. By analyzing visual features of medicine
+          images, it offers reliable information, potentially enhancing
+          medication safety and improving healthcare experiences.
+        </p>
+        <br />
+        <br>
+        <div class="headButton">
+          <div class="links">
+            <a href="/about">Know Us</a>
+          </div>
+          <div class="links">
+            <a href="/model">Try Now</a>
+          </div>
+        </div>
+      </div>
+      <div class="headerFlexx">
+        <img src="{{ url_for('static', filename='img/logo1.png')}}" alt="doctor" />
+      </div>
+    </div>
+
+
+    <br /><br />
+    <br /><br />
+
+    <br />
+
+
+
+
+  </div>
+  </div>
+  </div>
+
+  </div>
+
+  <script src="{{ url_for('static', filename='main.js') }}"></script>
+
+
+</body>
+
+
+</html>

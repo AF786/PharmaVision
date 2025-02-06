@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="{{ url_for('static', filename='/styles.css') }}">
+  <link rel="script" href="./static/main.js">
+  <link rel="icon" href="{{url_for('static', filename='img/logo.png')}}" type="image/x-icon">
+  <title>PharmaVision | Guide</title>
+</head>
+
+<body>
+  <div id="preloader"></div>
+
+  <div class="hero">
+    <div class="navbar-box">
+      <nav class="navbar">
+        <div class="logo">
+          <a href="/index">PharmaVision</a>
+        </div>
+        <div class="navlinks">
+          <a href="/" class="navlink">Home</a>
+          <a href="/about" class="navlink">About Us</a>
+          <a href="/guide" class="navlink">How To Use</a>
+          <a href="/product" class="navlink">Products</a>
+          <a href="/contact" class="navlink">Contact</a>
+          <a href="/model" class="navlink">Model</a>
+          <a href="/chatbot" class="navlink">Chat</a>
+        </div>
+
+      </nav>
+    </div>
+
+    <section class="about-section">
+      <h2>How To Use</h2>
+      <p>
+        Using the PharmaVision AI application is straightforward and user-friendly. To begin, simply upload a photo of
+        the pill you wish to identify by clicking the "Upload" button on the main interface. Once the image is uploaded,
+        the AI model will analyze it, using advanced machine learning algorithms to detect and recognize the pill.
+        Within moments, the system will provide comprehensive information about the pill, including details on its
+        composition, potential side effects, dosage recommendations, and other relevant data sourced through the Gemini
+        API.
+        <br><br>
+
+        PharmaVision also includes a chatbot-like feature, where you can type in questions to receive additional details
+        or clarification regarding the medication. This functionality allows users to inquire about specific concerns,
+        such as possible interactions with other medications or any contraindications, ensuring that users have a
+        complete understanding of the pill's properties. With its intuitive interface and responsive AI capabilities,
+        PharmaVision makes pill identification and information retrieval both efficient and accessible, ultimately
+        promoting safer medication use for its users.
+
+
+
+
+
+
+
+      </p>
+    </section>
+
+</body>
+<script src="{{ url_for('static', filename='main.js') }}"></script>
+
+</html>

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PharmaVision | Chatbot</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='/styles.css') }}"
+    />
+    <link
+      rel="icon"
+      href="{{url_for('static', filename='img/logo.png')}}"
+      type="image/x-icon"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
+  </head>
+  <body>
+    <div id="preloader"></div>
+
+    <div class="hero">
+      <div class="navbar-box">
+        <nav class="navbar">
+          <div class="logo">
+            <a href="/index">PharmaVision</a>
+          </div>
+          <div class="navlinks">
+            <a href="/" class="navlink">Home</a>
+            <a href="/about" class="navlink">About Us</a>
+            <a href="/guide" class="navlink">How To Use</a>
+            <a href="/product" class="navlink">Products</a>
+            <a href="/contact" class="navlink">Contact</a>
+            <a href="/model" class="navlink">Model</a>
+            <a href="/chatbot" class="navlink">Chat</a>
+          </div>
+        </nav>
+      </div>
+
+      <div class="chatbot-container">
+        <div class="chat-header">
+          <div class="bot-avatar">
+            <i class="fa-solid fa-robot"></i>
+          </div>
+          <div class="header-text">
+            <h2>PharmaVision Assistant</h2>
+          </div>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+          <div class="message bot welcome-message">
+            <i class="fas fa-robot bot-icon"></i>
+            <div class="message-content">
+              <p>
+                Hello! I'm your PharmaVision assistant. How can I help you
+                today?
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="chat-input">
+          <input
+            type="text"
+            id="userInput"
+            placeholder="Type your message..."
+          />
+          <button id="sendButton">
+            <i class="fas fa-paper-plane"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='chatbot.js') }}"></script>
+  </body>
+</html>
