@@ -14,6 +14,7 @@ from flask_mail import Mail, Message
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import tempfile
 
 load_dotenv()
 API_KEY = os.environ.get('ROBOFLOW_API_KEY')
@@ -154,63 +155,55 @@ def pill_detect():
         if not file.filename.lower().endswith(tuple(ALLOWED_EXTENSIONS)):
             return jsonify({"error": "Invalid file type. Please upload an image (PNG, JPG, JPEG, WEBP)"}), 400
 
+        print("Received request for pill detection")
         try:
-            # Process the image
-            image = Image.open(BytesIO(file.read()))
-            
-            # Image preprocessing
-            # Resize image for consistent processing
-            image = image.resize((800, 800))
-            # Convert to RGB if image is in RGBA
-            if image.mode == 'RGBA':
-                image = image.convert('RGB')
-            
-            # Convert to numpy array
-            image_np = np.array(image)
+            # Initialize Roboflow with API key
+            rf = Roboflow(api_key=API_KEY)
+            project = rf.workspace().project("pill-recognition-oxvel")
+            model = project.version(1).model
 
-            # Make prediction
-            result = model.predict(
-                image_np,
-                confidence=60,
-                overlap=30
-            ).json()
-
-            if 'predictions' in result and result['predictions']:
-                # Get the top prediction
-                prediction = result['predictions'][0]
-                pill_name = prediction['class']
-                confidence = prediction['confidence']
-
-                # Get detailed information about the detected pill
-                system_prompt = (
-                    "Provide detailed information about this medication:\n"
-                    f"The detected pill appears to be {pill_name} (Confidence: {confidence:.1f}%)\n"
-                    "Include:\n"
-                    "1. Primary uses and benefits\n"
-                    "2. Common dosage information\n"
-                    "3. Important safety warnings\n"
-                    "4. Common side effects\n"
-                    "5. Drug interactions to avoid"
-                )
-                
-                pill_info = get_gemini_response(f"Tell me about {pill_name} medication", system_prompt)
-
-                return jsonify({
-                    "pill_name": pill_name,
-                    "confidence": f"{confidence:.1f}%",
-                    "information": pill_info
-                })
+            # Validate if the model was successfully loaded
+            if model is None:
+                return jsonify({"error": "Model failed to load."}), 500
             else:
-                return jsonify({
-                    "error": "No pill detected in the image. Please ensure the image is clear and well-lit."
-                }), 400
+                print("Model loaded:", model)
+
+            # Check if file is included in the request
+            if 'file' not in request.files:
+                print("No file part in the request.")
+                return jsonify({"error": "No file part in the request."}), 400
+
+            file = request.files['file']
+
+            # Ensure the file has a valid name
+            if file.filename == '':
+                print("No selected file.")
+                return jsonify({"error": "No selected file."}), 400
+
+            # Try to open and process the image
+            try:
+                image = Image.open(BytesIO(file.read()))
+                print("Image opened successfully")  # Check if the image is opened
+                # Convert the PIL image to a format that the model can work with
+                image_np = np.array(image)  # Convert to a NumPy array
+                # Make the prediction
+                result = model.predict(image_np, confidence=40, overlap=30).json()
+                if 'predictions' in result and result['predictions']:
+                    pill_name = result['predictions'][0]['class']
+                    return jsonify({
+                        "pill_name": pill_name,
+                    })
+                else:
+                    print("No pill detected.")
+                    return jsonify({"error": "No pill detected."}), 400
+
+            except Exception as e:
+                print("Image processing error:", str(e))
+                return jsonify({"error": f"Image processing error: {str(e)}"}), 500
 
         except Exception as e:
-            print(f"Image processing error: {str(e)}")
-            return jsonify({
-                "error": "Error processing image. Please ensure the image is clear and try again."
-            }), 500
-
+            print("Internal server error:", str(e))
+            return jsonify({"error": f"Internal server error: {str(e)}"}), 500
     except Exception as e:
         print(f"Server error: {str(e)}")
         return jsonify({
@@ -279,6 +272,87 @@ def chat():
         print(f"Error: {str(e)}")
         return jsonify({'response': 'Sorry, I encountered an error. Please try again.'})
 
+@app.route('/skin',methods=['POST','GET'])
+def skin():
+    return render_template('skin.html')
+
+@app.route('/detect-skin',methods=['POST'])
+def detect_skin_disease():
+    try:
+        if 'file' not in request.files:
+            return jsonify({"error": "No image file provided"}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"error": "No selected file"}), 400
+
+        # List of allowed image extensions
+        ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
+        if not file.filename.lower().endswith(tuple(ALLOWED_EXTENSIONS)):
+            return jsonify({"error": "Invalid file type. Please upload an image (PNG, JPG, JPEG, WEBP)"}), 400
+
+        print("Received request for Disease detection")
+        try:
+            # Initialize Roboflow with API key
+            rf = Roboflow(api_key=API_KEY)
+            project = rf.workspace().project("skin-disease-vrvtv")
+            model = project.version(1).model
+
+            # Validate if the model was successfully loaded
+            if model is None:
+                return jsonify({"error": "Model failed to load."}), 500
+            else:
+                print("Model loaded:", model)
+
+            # Check if file is included in the request
+            if 'file' not in request.files:
+                print("No file part in the request.")
+                return jsonify({"error": "No file part in the request."}), 400
+
+            file = request.files['file']
+
+            # Ensure the file has a valid name
+            if file.filename == '':
+                print("No selected file.")
+                return jsonify({"error": "No selected file."}), 400
+
+            # Try to open and process the image
+            try:
+                image = Image.open(BytesIO(file.read()))
+                print("Image opened successfully")  # Check if the image is opened
+                # Convert the PIL image to a format that the model can work with
+                with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as temp:
+                    image_path = temp.name
+                    image.save(image_path)
+                    print(f"Saved image at temporary path: {image_path}")
+                print("Image Saved Successfully!!!")
+                result = model.predict(image_path, confidence=25, overlap=30).json()
+                print("Prediction result:", result)
+                if 'predictions' in result and result['predictions']:
+                    disease_name = result['predictions'][0]['class']
+                    print("Success - Disease detected:", disease_name)
+                    return jsonify({
+                        "disease_name": disease_name,
+                    })
+                else:
+                    print("No Disease detected.")
+                    return jsonify({"error": "No Disease detected."}), 400
+
+            except Exception as e:
+                print("Image processing error:", str(e))
+                return jsonify({"error": f"Image processing error: {str(e)}"}), 500
+
+        except Exception as e:
+            print("Internal server error:", str(e))
+            return jsonify({"error": f"Internal server error: {str(e)}"}), 500
+    except Exception as e:
+        print(f"Server error: {str(e)}")
+        return jsonify({
+            "error": "Internal server error. Please try again later."
+        }), 500
+
+            
+        
 if __name__ == "__main__":
     # Run the Flask app
     app.run("127.0.0.1", port=8080, debug=True)

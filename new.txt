@@ -1,0 +1,62 @@
+try:
+            # Process the image
+            image = Image.open(BytesIO(file.read()))
+            
+            # Image preprocessing
+            # Resize image for consistent processing
+            image = image.resize((800, 800))
+            # Convert to RGB if image is in RGBA
+            if image.mode == 'RGBA':
+                image = image.convert('RGB')
+            
+            # Convert to numpy array
+            image_np = np.array(image)
+
+            # Make prediction
+            result = model.predict(
+                image_np,
+                confidence=60,
+                overlap=30
+            ).json()
+
+            if 'predictions' in result and result['predictions']:
+                # Get the top prediction
+                prediction = result['predictions'][0]
+                pill_name = prediction['class']
+                confidence = prediction['confidence']
+
+                # Get detailed information about the detected pill
+                system_prompt = (
+                    "Provide detailed information about this medication:\n"
+                    f"The detected pill appears to be {pill_name} (Confidence: {confidence:.1f}%)\n"
+                    "Include:\n"
+                    "1. Primary uses and benefits\n"
+                    "2. Common dosage information\n"
+                    "3. Important safety warnings\n"
+                    "4. Common side effects\n"
+                    "5. Drug interactions to avoid"
+                )
+                
+                pill_info = get_gemini_response(f"Tell me about {pill_name} medication", system_prompt)
+
+                return jsonify({
+                    "pill_name": pill_name,
+                    "confidence": f"{confidence:.1f}%",
+                    "information": pill_info
+                })
+            else:
+                return jsonify({
+                    "error": "No pill detected in the image. Please ensure the image is clear and well-lit."
+                }), 400
+
+        except Exception as e:
+            print(f"Image processing error: {str(e)}")
+            return jsonify({
+                "error": "Error processing image. Please ensure the image is clear and try again."
+            }), 500
+
+    except Exception as e:
+        print(f"Server error: {str(e)}")
+        return jsonify({
+            "error": "Internal server error. Please try again later."
+        }), 500

@@ -35,7 +35,6 @@
             <a href="/contact" class="navlink">Contact</a>
             <a href="/model" class="navlink">Model</a>
             <a href="/chatbot" class="navlink">Chat</a>
-            <a href="/skin" class="navlink">Skin</a>
           </div>
         </nav>
       </div>
@@ -52,19 +51,19 @@
               flex-direction: column;
             "
           >
-            <h1>Search Medicine</h1>
+            <h1>Search Disease</h1>
             <p style="text-align: center">
               Experience hassle-free medication management with our dedicated
               services. Let us handle your medicines, ensuring you receive the
               care and attention your health deserves.
             </p>
             <br /><br />
-           
+
             <div class="search-cont">
               <form id="drugSearchForm" action="/get-drug-info" method="post">
                 <input
                   type="text"
-                  placeholder="Search medicine..."
+                  placeholder="Search disease..."
                   class="search-in"
                   id="drugInput"
                   name="drug_name"
@@ -245,7 +244,7 @@
           formData.append("file", file); // Append the file to the FormData object
 
           // Send the file to the Flask backend
-          fetch("/pill-detect", {
+          fetch("/detect-skin", {
             method: "POST",
             body: formData,
           })
@@ -263,14 +262,14 @@
                 resultContainer.innerHTML = `<p>Error: ${data.error}</p>`;
               } else {
                 resultContainer.innerHTML = `
-                            <h2>Pill Detected: ${data.pill_name}</h2>
-                            <p>${data.information}</p>
+                            <h2>Disease detected: ${data.disease_name}</h2>
+                            
                         `;
               }
             })
             .catch((error) => {
               console.error("Fetch error:", error); // Log the original fetch error
-              resultContainer.innerHTML = `<p>Error during pill detection: ${error.message}</p>`;
+              resultContainer.innerHTML = `<p>Error during disease detection: ${error.message}</p>`;
             });
         } else {
           clearInterval(loadingInterval);

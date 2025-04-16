@@ -1,8 +1,8 @@
 import requests
 from bs4 import BeautifulSoup
 
-def get_drug_info(name):
-    url = f'https://drugs.com/{name}.html'
+def get_drug_info(imprint):
+    url = f'https://www.drugs.com/imprints.php?{imprint}&color=&shape=0'
     resp = requests.get(url)
     soup = BeautifulSoup(resp.content,'html.parser')
     elem = soup.find()
