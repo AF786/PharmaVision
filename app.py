@@ -187,7 +187,7 @@ def pill_detect():
                 # Convert the PIL image to a format that the model can work with
                 image_np = np.array(image)  # Convert to a NumPy array
                 # Make the prediction
-                result = model.predict(image_np, confidence=40, overlap=30).json()
+                result = model.predict(image_np, confidence=10, overlap=30).json()
                 if 'predictions' in result and result['predictions']:
                     pill_name = result['predictions'][0]['class']
                     return jsonify({
@@ -326,7 +326,7 @@ def detect_skin_disease():
                     image.save(image_path)
                     print(f"Saved image at temporary path: {image_path}")
                 print("Image Saved Successfully!!!")
-                result = model.predict(image_path, confidence=25, overlap=30).json()
+                result = model.predict(image_path, confidence=20, overlap=30).json()
                 print("Prediction result:", result)
                 if 'predictions' in result and result['predictions']:
                     disease_name = result['predictions'][0]['class']
