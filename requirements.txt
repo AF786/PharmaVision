@@ -3,3 +3,8 @@ roboflow
 python-dotenv
 pandas
 openpyxl
+google-generativeai
+smtplib
+Pillow
+requests
+Flask-Mail
