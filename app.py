@@ -26,7 +26,7 @@ load_dotenv()
 API_KEY = os.environ.get('ROBOFLOW_API_KEY')
 GEMINI_KEY = os.environ.get('GEMINI_API_KEY')
 genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel("gemini-1.5-flash")
+model = genai.GenerativeModel("gemini-2.5-flash")
 
 app = Flask(__name__, template_folder='frontend', static_folder='frontend/static')
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')

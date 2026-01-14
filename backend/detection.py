@@ -18,7 +18,7 @@ print(f"Gemini API Key present: {bool(GEMINI_KEY)}")
 
 if GEMINI_KEY:
     genai.configure(api_key=GEMINI_KEY)
-    model = genai.GenerativeModel("gemini-pro")
+    model = genai.GenerativeModel("gemini-2.5-flash")
 else:
     print("WARNING: GEMINI_API_KEY not found in environment variables")
     model = None
@@ -62,14 +62,11 @@ def get_gemini_response(user_message, system_prompt):
         if model is None:
             print("ERROR: Gemini model not configured - API key missing")
             return "Service configuration error. Please contact administrator."
-        
-        # Add timeout handling
-        start_time = time.time()
-        timeout = 10  # 10 seconds timeout
 
         # Simplified prompt to reduce response time
         full_prompt = f"{system_prompt}\n{user_message}"
         
+        print(f"Sending request to Gemini API...")
         # Set generation config for faster response
         response = model.generate_content(
             full_prompt,
@@ -77,14 +74,12 @@ def get_gemini_response(user_message, system_prompt):
                 'temperature': 0.7,
                 'top_p': 0.8,
                 'top_k': 40,
-                'max_output_tokens': 1024,
-            }
+                'max_output_tokens': 2048,
+            },
+            request_options={'timeout': 30}
         )
 
-        # Check for timeout
-        if time.time() - start_time > timeout:
-            return "Request timed out. Please try again."
-
+        print(f"Received response from Gemini API")
         if response.text:
             return response.text
         return "No response generated"
