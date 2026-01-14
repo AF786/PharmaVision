@@ -70,6 +70,17 @@
             </p>
             <br /><br />
            
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                {% for category, message in messages %}
+                  <div class="alert alert-{{ category }}" style="padding: 15px; margin: 10px 0; border-radius: 5px; text-align: center; {% if category == 'error' %}background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;{% else %}background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;{% endif %}">
+                    {{ message }}
+                  </div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
+
             <div class="search-cont">
               <form id="drugSearchForm" action="/get-drug-info" method="post">
                 <input
@@ -88,10 +99,12 @@
                 </button>
               </form>
             </div>
-            <div class="results" id="results">
+            <div class="results" id="results" style="{% if pill_info %}display: block; background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); padding: 25px; margin-top: 20px;{% else %}display: none;{% endif %}">
               {% if pill_info %}
-              <h2>{{ pill_info.pill_name }}</h2>
-              <p>{{ pill_info.information|safe }}</p>
+              <h2 style="color: #14967f; font-size: 28px; margin-bottom: 20px;">{{ pill_info.pill_name }}</h2>
+              <div style="line-height: 1.8; font-size: 16px; color: #333;">
+                {{ pill_info.information|safe }}
+              </div>
               {% endif %}
             </div>
 
@@ -147,10 +160,21 @@
         }
 
         // Show loading state
-        resultsContainer.innerHTML = '<div class="loading" style="text-align: center; padding: 20px; color: #14967f;">Loading drug information...</div>';
+        resultsContainer.style.display = 'block';
+        resultsContainer.innerHTML = '<div class="loading" style="text-align: center; padding: 20px; color: #14967f; font-size: 18px;">Loading drug information...</div>';
 
         // Submit the form normally to get the full page reload with results
         document.getElementById("drugSearchForm").submit();
+      });
+
+      // Scroll to results if they exist on page load
+      window.addEventListener('load', function() {
+        const resultsDiv = document.getElementById('results');
+        if (resultsDiv && resultsDiv.style.display !== 'none' && resultsDiv.innerHTML.trim() !== '') {
+          setTimeout(function() {
+            resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 300);
+        }
       });
 
       // File upload functionality
