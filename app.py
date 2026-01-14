@@ -50,16 +50,26 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Database connection helper
 def get_db_connection():
-    database_url = os.environ.get('DATABASE_URL')
-    if database_url and database_url.startswith('postgres://'):
-        database_url = database_url.replace('postgres://', 'postgresql://', 1)
-    conn = psycopg2.connect(database_url, cursor_factory=RealDictCursor)
-    return conn
+    try:
+        database_url = os.environ.get('DATABASE_URL')
+        if not database_url:
+            print("ERROR: DATABASE_URL not found in environment variables")
+            return None
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        conn = psycopg2.connect(database_url, cursor_factory=RealDictCursor)
+        return conn
+    except Exception as e:
+        print(f"Database connection error: {e}")
+        return None
 
 # Database setup
 def init_db():
     try:
         conn = get_db_connection()
+        if not conn:
+            print("WARNING: Database connection failed. Some features may not work.")
+            return
         c = conn.cursor()
         c.execute('''
             CREATE TABLE IF NOT EXISTS users (
@@ -84,6 +94,7 @@ def init_db():
         print("Database initialized successfully")
     except Exception as e:
         print(f"Database initialization error: {e}")
+        print("WARNING: App will run but database features won't work")
 
 # Initialize database
 init_db()
@@ -294,26 +305,38 @@ def model():
 @app.route('/submit_form', methods=['POST'])
 def submit_form():
     try:
-        name = request.form['name']
-        email = request.form['email']
-        message = request.form['message']
+        name = request.form.get('name', '').strip()
+        email = request.form.get('email', '').strip()
+        message = request.form.get('message', '').strip()
+
+        if not all([name, email, message]):
+            flash('All fields are required!', 'error')
+            return redirect('/contact')
+
+        print(f"Contact form submission: {name} - {email}")
 
         # Store in database
         try:
             conn = get_db_connection()
-            c = conn.cursor()
-            c.execute('INSERT INTO contacts (name, email, message) VALUES (%s, %s, %s)',
-                      (name, email, message))
-            conn.commit()
-            conn.close()
-            print(f"Contact form saved to database: {name} - {email}")
+            if conn:
+                c = conn.cursor()
+                c.execute('INSERT INTO contacts (name, email, message) VALUES (%s, %s, %s)',
+                          (name, email, message))
+                conn.commit()
+                conn.close()
+                print(f"Contact form saved to database successfully")
+            else:
+                print("Database connection failed - contact not saved")
         except Exception as db_error:
             print(f"Database error: {str(db_error)}")
 
-        # Try to send email (but don't fail if it doesn't work)
+        # Try to send email (optional)
         try:
             recipient = os.environ.get('RECIPIENT_EMAIL')
-            if recipient:
+            sender_email = os.environ.get('SENDER_EMAIL')
+            sender_password = os.environ.get('SENDER_PASSWORD')
+            
+            if all([recipient, sender_email, sender_password]):
                 subject = f"New Contact Form Submission from {name}"
                 body = f"""
                 New contact form submission:
@@ -324,17 +347,19 @@ def submit_form():
                 """
 
                 msg = MIMEMultipart()
-                msg['From'] = os.environ.get('SENDER_EMAIL')
+                msg['From'] = sender_email
                 msg['To'] = recipient
                 msg['Subject'] = subject
                 msg.attach(MIMEText(body, 'plain'))
 
                 server = smtplib.SMTP('smtp.gmail.com', 587)
                 server.starttls()
-                server.login(os.environ.get('SENDER_EMAIL'), os.environ.get('SENDER_PASSWORD'))
+                server.login(sender_email, sender_password)
                 server.send_message(msg)
                 server.quit()
                 print("Email sent successfully")
+            else:
+                print("Email credentials not configured - skipping email")
         except Exception as email_error:
             print(f"Email error (contact saved to DB): {str(email_error)}")
 
@@ -342,8 +367,10 @@ def submit_form():
         return redirect('/contact')
 
     except Exception as e:
-        print(f"Error: {str(e)}")
-        flash('An error occurred while sending your message.', 'error')
+        print(f"Contact form error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        flash('An error occurred while sending your message. Please try again.', 'error')
         return redirect('/contact')
 
 @app.route('/pill-detect', methods=['POST'])
