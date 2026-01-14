@@ -25,7 +25,12 @@
       <div class="navbar-box">
         <nav class="navbar">
           <div class="logo">
-            <a href="/index">PharmaVision</a>
+            <a href="/">PharmaVision</a>
+          </div>
+          <div class="hamburger">
+            <span></span>
+            <span></span>
+            <span></span>
           </div>
           <div class="navlinks">
             <a href="/" class="navlink">Home</a>
@@ -278,5 +283,6 @@
         }
       });
     </script>
+    <script src="{{ url_for('static', filename='main.js') }}"></script>
   </body>
 </html>

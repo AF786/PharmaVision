@@ -3,6 +3,39 @@ setTimeout(function () {
   loader.style.display = "none";
 }, (timeout = 2000));
 
+// Hamburger Menu Toggle
+document.addEventListener('DOMContentLoaded', function() {
+  const hamburger = document.querySelector('.hamburger');
+  const navlinks = document.querySelector('.navlinks');
+  
+  if (hamburger) {
+    hamburger.addEventListener('click', function() {
+      hamburger.classList.toggle('active');
+      navlinks.classList.toggle('active');
+    });
+
+    // Close menu when clicking on a link
+    const navItems = document.querySelectorAll('.navlink');
+    navItems.forEach(item => {
+      item.addEventListener('click', function() {
+        hamburger.classList.remove('active');
+        navlinks.classList.remove('active');
+      });
+    });
+
+    // Close menu when clicking outside
+    document.addEventListener('click', function(event) {
+      const isClickInsideNav = navlinks.contains(event.target);
+      const isClickOnHamburger = hamburger.contains(event.target);
+      
+      if (!isClickInsideNav && !isClickOnHamburger && navlinks.classList.contains('active')) {
+        hamburger.classList.remove('active');
+        navlinks.classList.remove('active');
+      }
+    });
+  }
+});
+
 document.getElementById("openDialogBtn").addEventListener("click", openDialog);
 
 function openDialog() {
