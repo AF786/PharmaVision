@@ -70,6 +70,15 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS contacts (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL,
+                message TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
         conn.commit()
         conn.close()
         print("Database initialized successfully")
@@ -212,6 +221,70 @@ def logout():
     flash('You have been logged out successfully.', 'success')
     return redirect(url_for('signin'))
 
+@app.route('/admin-dashboard-secret')
+def admin():
+    # Simple password protection - you can enhance this
+    auth_token = request.args.get('token')
+    if auth_token != os.environ.get('ADMIN_TOKEN', 'pharma-admin-2026'):
+        return "Unauthorized Access", 403
+    
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('SELECT * FROM contacts ORDER BY created_at DESC')
+        contacts = c.fetchall()
+        conn.close()
+        
+        # Create simple HTML table
+        html = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Admin Dashboard - Contact Forms</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+                h1 { color: #14967f; }
+                table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                th { background: #14967f; color: white; padding: 12px; text-align: left; }
+                td { padding: 12px; border-bottom: 1px solid #ddd; }
+                tr:hover { background: #f9f9f9; }
+                .count { background: #14967f; color: white; padding: 10px 20px; border-radius: 5px; display: inline-block; margin: 20px 0; }
+            </style>
+        </head>
+        <body>
+            <h1>📊 Admin Dashboard - Contact Form Submissions</h1>
+            <div class="count">Total Submissions: """ + str(len(contacts)) + """</div>
+            <table>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Message</th>
+                    <th>Date</th>
+                </tr>
+        """
+        
+        for contact in contacts:
+            html += f"""
+                <tr>
+                    <td>{contact['id']}</td>
+                    <td>{contact['name']}</td>
+                    <td>{contact['email']}</td>
+                    <td>{contact['message'][:100]}...</td>
+                    <td>{contact['created_at']}</td>
+                </tr>
+            """
+        
+        html += """
+            </table>
+        </body>
+        </html>
+        """
+        
+        return html
+    except Exception as e:
+        return f"Error: {str(e)}", 500
+
 @app.route('/model',methods=['GET','POST'])
 @login_required
 def model():
@@ -225,49 +298,47 @@ def submit_form():
         email = request.form['email']
         message = request.form['message']
 
-        # Create email content
-        recipient = os.environ.get('RECIPIENT_EMAIL')
-        subject = f"New Contact Form Submission from {name}"
-        body = f"""
-        New contact form submission:
-        
-        Name: {name}
-        Email: {email}
-        Message: {message}
-        """
-
-        # Create and send email
-        msg = MIMEMultipart()
-        msg['From'] = os.environ.get('SENDER_EMAIL')
-        msg['To'] = recipient
-        msg['Subject'] = subject
-
-        msg.attach(MIMEText(body, 'plain'))
-
-        # Create SMTP session
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(os.environ.get('SENDER_EMAIL'), os.environ.get('SENDER_PASSWORD'))
-        
-        # Send email
-        server.send_message(msg)
-        server.quit()
-
-        # Store in Excel
-        form_data = {
-            'Name': [name],
-            'Email': [email],
-            'Message': [message]
-        }
-        write_data = pd.DataFrame(form_data)
+        # Store in database
         try:
-            with pd.ExcelWriter('contact_responses.xlsx', mode='a', engine='openpyxl', if_sheet_exists='overlay') as writer:
-                write_data.to_excel(writer, index=False, header=False, startrow=writer.sheets['Sheet1'].max_row)
-        except FileNotFoundError:
-            write_data.to_excel('contact_responses.xlsx', index=False)
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute('INSERT INTO contacts (name, email, message) VALUES (%s, %s, %s)',
+                      (name, email, message))
+            conn.commit()
+            conn.close()
+            print(f"Contact form saved to database: {name} - {email}")
+        except Exception as db_error:
+            print(f"Database error: {str(db_error)}")
 
-        # Flash success message before redirect
-        flash('Your email has been successfully sent!', 'success')
+        # Try to send email (but don't fail if it doesn't work)
+        try:
+            recipient = os.environ.get('RECIPIENT_EMAIL')
+            if recipient:
+                subject = f"New Contact Form Submission from {name}"
+                body = f"""
+                New contact form submission:
+                
+                Name: {name}
+                Email: {email}
+                Message: {message}
+                """
+
+                msg = MIMEMultipart()
+                msg['From'] = os.environ.get('SENDER_EMAIL')
+                msg['To'] = recipient
+                msg['Subject'] = subject
+                msg.attach(MIMEText(body, 'plain'))
+
+                server = smtplib.SMTP('smtp.gmail.com', 587)
+                server.starttls()
+                server.login(os.environ.get('SENDER_EMAIL'), os.environ.get('SENDER_PASSWORD'))
+                server.send_message(msg)
+                server.quit()
+                print("Email sent successfully")
+        except Exception as email_error:
+            print(f"Email error (contact saved to DB): {str(email_error)}")
+
+        flash('Your message has been successfully submitted!', 'success')
         return redirect('/contact')
 
     except Exception as e:
