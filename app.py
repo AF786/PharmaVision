@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request, render_template, redirect, flash
+from flask import Flask, request, render_template, redirect, flash, session, url_for
 from flask import jsonify
 from pathlib import Path
 from backend.detection import get_gemini_response, analyze_pill_image
@@ -15,6 +15,12 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import tempfile
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
+from datetime import datetime
+from urllib.parse import urlparse
 
 load_dotenv()
 API_KEY = os.environ.get('ROBOFLOW_API_KEY')
@@ -41,6 +47,47 @@ app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('SENDER_EMAIL')
 mail = Mail(app)
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# Database connection helper
+def get_db_connection():
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url and database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    conn = psycopg2.connect(database_url, cursor_factory=RealDictCursor)
+    return conn
+
+# Database setup
+def init_db():
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.commit()
+        conn.close()
+        print("Database initialized successfully")
+    except Exception as e:
+        print(f"Database initialization error: {e}")
+
+# Initialize database
+init_db()
+
+# Login required decorator
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Please sign in to access this page.', 'error')
+            return redirect(url_for('signin'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Create vision prompt
 vision_prompt = """
@@ -78,7 +125,95 @@ def product():
 def contact():
     return render_template('contactus.html')
 
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        name = request.form.get('name')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        
+        # Validation
+        if not all([name, email, password, confirm_password]):
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute('SELECT * FROM users WHERE email = %s', (email,))
+            if c.fetchone():
+                conn.close()
+                flash('Email already registered!', 'error')
+                return redirect(url_for('signup'))
+            
+            # Hash password and create user
+            hashed_password = generate_password_hash(password)
+            c.execute('INSERT INTO users (name, email, password) VALUES (%s, %s, %s)',
+                      (name, email, hashed_password))
+            conn.commit()
+            conn.close()
+            
+            flash('Account created successfully! Please sign in.', 'success')
+            return redirect(url_for('signin'))
+        except Exception as e:
+            print(f"Signup error: {e}")
+            flash('An error occurred. Please try again.', 'error')
+            return redirect(url_for('signup
+            flash('Email already registered!', 'error')
+            return redirect(url_for('signup'))
+        
+        # Hash password and create user
+        hashed_password = generate_password_hash(password)
+        c.execute('INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
+                  (name, email, hashed_password))
+        conn.commit()
+        conn.close()
+        
+        flash('Account created successfully! Please sign in.', 'success')
+        return redirect(url_for('signin'))
+    
+    return render_template('signup.html')
+
+@app.route('/signin', methods=['GET', 'POST'])
+def signin():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute('SELECT * FROM users WHERE email = %s', (email,))
+            user = c.fetchone()
+            conn.close()
+            
+            if user and check_password_hash(user['password'], password):
+                session['user_id'] = user['id']
+                session['user_name'] = user['name']
+                session['user_email'] = user['email']
+                flash(f'Welcome back, {user["name"]}!', 'success')
+                return redirect(url_for('index'))
+            else:
+                flash('Invalid email or password!', 'error')
+                return redirect(url_for('signin'))
+        except Exception as e:
+            print(f"Signin error: {e}")
+            flash('An error occurred. Please try again.
+            session['user_email'] = user[2]
+            flash(f'Welcome back, {user[1]}!', 'success')
+            return redirect(url_for('index'))
+        else:
+            flash('Invalid email or password!', 'error')
+            return redirect(url_for('signin'))
+    
+    return render_template('signin.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('You have been logged out successfully.', 'success')
+    return redirect(url_for('signin'))
+
 @app.route('/model',methods=['GET','POST'])
+@login_required
 def model():
     return render_template('model.html')
 
@@ -170,6 +305,7 @@ def pill_detect():
 
             # Check if file is included in the request
             if 'file' not in request.files:
+@login_required
                 print("No file part in the request.")
                 return jsonify({"error": "No file part in the request."}), 400
 

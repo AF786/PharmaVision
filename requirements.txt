@@ -8,3 +8,4 @@ secure-smtplib
 Pillow
 requests
 Flask-Mail
+psycopg2-binary

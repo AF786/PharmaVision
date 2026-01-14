@@ -1,14 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PharmaVision | Contact Us</title>
+  <title>PharmaVision | Sign In</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
   <link rel="icon" href="{{url_for('static', filename='img/logo.png')}}" type="image/x-icon">
 </head>
-
 <body>
   <div id="preloader"></div>
 
@@ -16,7 +14,7 @@
     <div class="navbar-box">
       <nav class="navbar">
         <div class="logo">
-          <a href="/index">PharmaVision</a>
+          <a href="/">PharmaVision</a>
         </div>
         <div class="hamburger">
           <span></span>
@@ -26,54 +24,35 @@
         <div class="navlinks">
           <a href="/" class="navlink">Home</a>
           <a href="/about" class="navlink">About Us</a>
-          <a href="/guide" class="navlink">How To Use</a>
-          <a href="/product" class="navlink">Products</a>
-          <a href="/contact" class="navlink">Contact</a>
-          <a href="/model" class="navlink">Model</a>
-          <a href="/chatbot" class="navlink">Chat</a>
-          {% if session.get('user_id') %}
-            <a href="/logout" class="navlink">Logout</a>
-          {% else %}
-            <a href="/signin" class="navlink">Sign In</a>
-          {% endif %}
+          <a href="/signin" class="navlink">Sign In</a>
+          <a href="/signup" class="navlink">Sign Up</a>
         </div>
-
       </nav>
     </div>
 
     <div class="contact-container">
-      <h2>Contact Us</h2>
-      <form class="contact-form" action="/submit_form" method="POST">
-        <label for="name">Your Name:</label>
-        <input type="text" id="name" name="name" placeholder="Enter your name" required>
-
-        <label for="email">Your Email:</label>
+      <h2>Sign In</h2>
+      <form class="contact-form" action="/signin" method="POST">
+        <label for="email">Email:</label>
         <input type="email" id="email" name="email" placeholder="Enter your email" required>
 
-        <label for="message">Your Message:</label>
-        <textarea id="message" name="message" placeholder="Enter your message" required></textarea>
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" placeholder="Enter your password" required>
 
-        <button type="submit">Send Message</button>
+        <button type="submit">Sign In</button>
       </form>
 
       <div class="contact-info">
-        <p>Email: arqamfarooqi39@gmail.com</p>
-        <!-- <p>Phone: +91 7715019020</p> -->
-        <!-- <a href="https://www.linkedin.com/in/arqam-farooqi-454935260/?originalSubdomain=in"><p>Linkedin</p></a> -->
-        <!-- <div>
-                <p>Email: arkhams312@gmail.com</p>
-                <p>Phone: +91 7718041204</p>
-                <p>Linkedin</p>
-            </div> -->
+        <p>Don't have an account? <a href="/signup" style="color: #5cb85c;">Sign Up</a></p>
       </div>
     </div>
 
-    {% with messages = get_flashed_messages() %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             <div class="custom-alert" id="customAlert">
                 <div class="custom-alert-content">
-                    <span class="custom-alert-icon">✓</span>
-                    <p class="custom-alert-message">{{ messages[0] }}</p>
+                    <span class="custom-alert-icon">{{ '✓' if messages[0][0] == 'success' else '⚠' }}</span>
+                    <p class="custom-alert-message">{{ messages[0][1] }}</p>
                 </div>
             </div>
             <script type="text/javascript">
