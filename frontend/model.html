@@ -146,22 +146,11 @@
           return;
         }
 
-        // Create a form and submit it
-        const form = new FormData();
-        form.append("drug_name", pillName);
+        // Show loading state
+        resultsContainer.innerHTML = '<div class="loading" style="text-align: center; padding: 20px; color: #14967f;">Loading drug information...</div>';
 
-        fetch("/get-drug-info", {
-          method: "POST",
-          body: form,
-        })
-          .then((response) => response.text())
-          .then((html) => {
-            // Replace the current page with the returned HTML
-            document.open();
-            document.write(html);
-            document.close();
-          })
-          .catch((error) => console.error("Error:", error));
+        // Submit the form normally to get the full page reload with results
+        document.getElementById("drugSearchForm").submit();
       });
 
       // File upload functionality

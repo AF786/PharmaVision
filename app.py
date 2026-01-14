@@ -17,6 +17,7 @@ from email.mime.multipart import MIMEMultipart
 import tempfile
 import psycopg2
 from psycopg2.extras import RealDictCursor
+import sqlite3
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from datetime import datetime
@@ -48,35 +49,72 @@ mail = Mail(app)
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
+# Check if using PostgreSQL or SQLite
+USE_SQLITE = os.environ.get('USE_SQLITE', 'false').lower() == 'true'
+
 # Database connection helper
 def get_db_connection():
     try:
-        database_url = os.environ.get('DATABASE_URL')
-        if not database_url:
-            print("ERROR: DATABASE_URL not found in environment variables")
-            return None
-        if database_url.startswith('postgres://'):
-            database_url = database_url.replace('postgres://', 'postgresql://', 1)
-        conn = psycopg2.connect(database_url, cursor_factory=RealDictCursor)
-        return conn
-    except Exception as e:
-        print(f"Database connection error: {e}")
-        return None
-
-# Database setup
-def init_db():
-    try:
-        conn = get_db_connection()
-        if not conn:
-            print("WARNING: Database connection failed. Some features may not work.")
-            return
+        if USE_SQLITE:
+            # Use SQLite for local development
+            conn = sqlite3.connect('pharmavision_local.db')
+            conn.row_factory = sqlite3.Row
+            return conn
+        else:
+            # Use PostgreSQL for production
+            database_url = os.environ.get('DATABASE_URL')
+            if not database_url:
+                print("ERROR: DATABASE_URL not found, falling back to SQLite")
+                conn = sqlite3.connect('pharmavision_local.db')
+                conn.row_factory = sqlite3.Row
+                return conn
         c = conn.cursor()
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                name TEXT NOT NULL,
-                email TEXT UNIQUE NOT NULL,
-                password TEXT NOT NULL,
+        
+        if USE_SQLITE:
+            # SQLite syntax
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    email TEXT UNIQUE NOT NULL,
+                    password TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS contacts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    email TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+        else:
+            # PostgreSQL syntax
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    email TEXT UNIQUE NOT NULL,
+                    password TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS contacts (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    email TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+        
+        conn.commit()
+        conn.close()
+        db_type = "SQLite" if USE_SQLITE else "PostgreSQL"
+        print(f"Database initialized successfully using {db_type}
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -148,16 +186,27 @@ def contact():
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
-        name = request.form.get('name')
-        email = request.form.get('email')
-        password = request.form.get('password')
-        confirm_password = request.form.get('confirm_password')
-        
-        # Validation
-        if not all([name, email, password, confirm_password]):
-            flash('All fields are required!', 'error')
-            return redirect(url_for('signup'))
-        
+        name
+            if USE_SQLITE:
+                c.execute('SELECT * FROM users WHERE email = ?', (email,))
+            else:
+                c.execute('SELECT * FROM users WHERE email = %s', (email,))
+                
+            if c.fetchone():
+                conn.close()
+                flash('Email already registered!', 'error')
+                return redirect(url_for('signup'))
+            
+            # Hash password and create user
+            hashed_password = generate_password_hash(password)
+            
+            if USE_SQLITE:
+                c.execute('INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
+                          (name, email, hashed_password))
+            else:
+                c.execute('INSERT INTO users (name, email, password) VALUES (%s, %s, %s)',
+                          (name, email, hashed_password))
+                          
         if password != confirm_password:
             flash('Passwords do not match!', 'error')
             return redirect(url_for('signup'))
@@ -173,16 +222,37 @@ def signup():
             c.execute('SELECT * FROM users WHERE email = %s', (email,))
             if c.fetchone():
                 conn.close()
-                flash('Email already registered!', 'error')
-                return redirect(url_for('signup'))
             
-            # Hash password and create user
-            hashed_password = generate_password_hash(password)
-            c.execute('INSERT INTO users (name, email, password) VALUES (%s, %s, %s)',
-                      (name, email, hashed_password))
-            conn.commit()
+            if USE_SQLITE:
+                c.execute('SELECT * FROM users WHERE email = ?', (email,))
+            else:
+                c.execute('SELECT * FROM users WHERE email = %s', (email,))
+                
+            user = c.fetchone()
             conn.close()
             
+            if user:
+                # Handle both SQLite Row and PostgreSQL dict
+                if USE_SQLITE:
+                    user_password = user['password']
+                    user_id = user['id']
+                    user_name = user['name']
+                    user_email = user['email']
+                else:
+                    user_password = user['password']
+                    user_id = user['id']
+                    user_name = user['name']
+                    user_email = user['email']
+                
+                if check_password_hash(user_password, password):
+                    session['user_id'] = user_id
+                    session['user_name'] = user_name
+                    session['user_email'] = user_email
+                    flash(f'Welcome back, {user_name}!', 'success')
+                    return redirect(url_for('index'))
+                else:
+                    flash('Invalid email or password!', 'error')
+                    return redirect(url_for('signin
             flash('Account created successfully! Please sign in.', 'success')
             return redirect(url_for('signin'))
         except Exception as e:
@@ -288,8 +358,12 @@ def admin():
         
         html += """
             </table>
-        </body>
-        </html>
+        </body>if USE_SQLITE:
+                    c.execute('INSERT INTO contacts (name, email, message) VALUES (?, ?, ?)',
+                              (name, email, message))
+                else:
+                    c.execute('INSERT INTO contacts (name, email, message) VALUES (%s, %s, %s)',
+            </html>
         """
         
         return html
