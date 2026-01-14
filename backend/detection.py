@@ -18,7 +18,7 @@ print(f"Gemini API Key present: {bool(GEMINI_KEY)}")
 
 if GEMINI_KEY:
     genai.configure(api_key=GEMINI_KEY)
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-pro")
 else:
     print("WARNING: GEMINI_API_KEY not found in environment variables")
     model = None
