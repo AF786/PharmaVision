@@ -135,6 +135,18 @@ def signup():
         
         # Validation
         if not all([name, email, password, confirm_password]):
+            flash('All fields are required!', 'error')
+            return redirect(url_for('signup'))
+        
+        if password != confirm_password:
+            flash('Passwords do not match!', 'error')
+            return redirect(url_for('signup'))
+        
+        if len(password) < 6:
+            flash('Password must be at least 6 characters long!', 'error')
+            return redirect(url_for('signup'))
+        
+        # Check if user already exists
         try:
             conn = get_db_connection()
             c = conn.cursor()
@@ -156,19 +168,7 @@ def signup():
         except Exception as e:
             print(f"Signup error: {e}")
             flash('An error occurred. Please try again.', 'error')
-            return redirect(url_for('signup
-            flash('Email already registered!', 'error')
             return redirect(url_for('signup'))
-        
-        # Hash password and create user
-        hashed_password = generate_password_hash(password)
-        c.execute('INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
-                  (name, email, hashed_password))
-        conn.commit()
-        conn.close()
-        
-        flash('Account created successfully! Please sign in.', 'success')
-        return redirect(url_for('signin'))
     
     return render_template('signup.html')
 
@@ -178,6 +178,11 @@ def signin():
         email = request.form.get('email')
         password = request.form.get('password')
         
+        if not all([email, password]):
+            flash('All fields are required!', 'error')
+            return redirect(url_for('signin'))
+        
+        # Check credentials
         try:
             conn = get_db_connection()
             c = conn.cursor()
@@ -196,12 +201,7 @@ def signin():
                 return redirect(url_for('signin'))
         except Exception as e:
             print(f"Signin error: {e}")
-            flash('An error occurred. Please try again.
-            session['user_email'] = user[2]
-            flash(f'Welcome back, {user[1]}!', 'success')
-            return redirect(url_for('index'))
-        else:
-            flash('Invalid email or password!', 'error')
+            flash('An error occurred. Please try again.', 'error')
             return redirect(url_for('signin'))
     
     return render_template('signin.html')
@@ -305,7 +305,6 @@ def pill_detect():
 
             # Check if file is included in the request
             if 'file' not in request.files:
-@login_required
                 print("No file part in the request.")
                 return jsonify({"error": "No file part in the request."}), 400
 
@@ -385,6 +384,7 @@ def how_to_use():
 
 @app.route('/chatbot', methods=['GET'])
 def chatbot():
+@login_required
     return render_template('chatbot.html')
 
 @app.route('/chat', methods=['POST'])
