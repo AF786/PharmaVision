@@ -383,8 +383,8 @@ def how_to_use():
     return render_template('guide.html')
 
 @app.route('/chatbot', methods=['GET'])
-def chatbot():
 @login_required
+def chatbot():
     return render_template('chatbot.html')
 
 @app.route('/chat', methods=['POST'])
