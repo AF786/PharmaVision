@@ -17,7 +17,6 @@ from email.mime.multipart import MIMEMultipart
 import tempfile
 import psycopg2
 from psycopg2.extras import RealDictCursor
-import sqlite3
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from datetime import datetime
@@ -49,72 +48,35 @@ mail = Mail(app)
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# Check if using PostgreSQL or SQLite
-USE_SQLITE = os.environ.get('USE_SQLITE', 'false').lower() == 'true'
-
 # Database connection helper
 def get_db_connection():
     try:
-        if USE_SQLITE:
-            # Use SQLite for local development
-            conn = sqlite3.connect('pharmavision_local.db')
-            conn.row_factory = sqlite3.Row
-            return conn
-        else:
-            # Use PostgreSQL for production
-            database_url = os.environ.get('DATABASE_URL')
-            if not database_url:
-                print("ERROR: DATABASE_URL not found, falling back to SQLite")
-                conn = sqlite3.connect('pharmavision_local.db')
-                conn.row_factory = sqlite3.Row
-                return conn
+        database_url = os.environ.get('DATABASE_URL')
+        if not database_url:
+            print("ERROR: DATABASE_URL not found in environment variables")
+            return None
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        conn = psycopg2.connect(database_url, cursor_factory=RealDictCursor)
+        return conn
+    except Exception as e:
+        print(f"Database connection error: {e}")
+        return None
+
+# Database setup
+def init_db():
+    try:
+        conn = get_db_connection()
+        if not conn:
+            print("WARNING: Database connection failed. Some features may not work.")
+            return
         c = conn.cursor()
-        
-        if USE_SQLITE:
-            # SQLite syntax
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL,
-                    email TEXT UNIQUE NOT NULL,
-                    password TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS contacts (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL,
-                    email TEXT NOT NULL,
-                    message TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-        else:
-            # PostgreSQL syntax
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS users (
-                    id SERIAL PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    email TEXT UNIQUE NOT NULL,
-                    password TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS contacts (
-                    id SERIAL PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    email TEXT NOT NULL,
-                    message TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-        
-        conn.commit()
-        conn.close()
-        db_type = "SQLite" if USE_SQLITE else "PostgreSQL"
-        print(f"Database initialized successfully using {db_type}
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -186,27 +148,16 @@ def contact():
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
-        name
-            if USE_SQLITE:
-                c.execute('SELECT * FROM users WHERE email = ?', (email,))
-            else:
-                c.execute('SELECT * FROM users WHERE email = %s', (email,))
-                
-            if c.fetchone():
-                conn.close()
-                flash('Email already registered!', 'error')
-                return redirect(url_for('signup'))
-            
-            # Hash password and create user
-            hashed_password = generate_password_hash(password)
-            
-            if USE_SQLITE:
-                c.execute('INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
-                          (name, email, hashed_password))
-            else:
-                c.execute('INSERT INTO users (name, email, password) VALUES (%s, %s, %s)',
-                          (name, email, hashed_password))
-                          
+        name = request.form.get('name')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        
+        # Validation
+        if not all([name, email, password, confirm_password]):
+            flash('All fields are required!', 'error')
+            return redirect(url_for('signup'))
+        
         if password != confirm_password:
             flash('Passwords do not match!', 'error')
             return redirect(url_for('signup'))
@@ -222,37 +173,16 @@ def signup():
             c.execute('SELECT * FROM users WHERE email = %s', (email,))
             if c.fetchone():
                 conn.close()
+                flash('Email already registered!', 'error')
+                return redirect(url_for('signup'))
             
-            if USE_SQLITE:
-                c.execute('SELECT * FROM users WHERE email = ?', (email,))
-            else:
-                c.execute('SELECT * FROM users WHERE email = %s', (email,))
-                
-            user = c.fetchone()
+            # Hash password and create user
+            hashed_password = generate_password_hash(password)
+            c.execute('INSERT INTO users (name, email, password) VALUES (%s, %s, %s)',
+                      (name, email, hashed_password))
+            conn.commit()
             conn.close()
             
-            if user:
-                # Handle both SQLite Row and PostgreSQL dict
-                if USE_SQLITE:
-                    user_password = user['password']
-                    user_id = user['id']
-                    user_name = user['name']
-                    user_email = user['email']
-                else:
-                    user_password = user['password']
-                    user_id = user['id']
-                    user_name = user['name']
-                    user_email = user['email']
-                
-                if check_password_hash(user_password, password):
-                    session['user_id'] = user_id
-                    session['user_name'] = user_name
-                    session['user_email'] = user_email
-                    flash(f'Welcome back, {user_name}!', 'success')
-                    return redirect(url_for('index'))
-                else:
-                    flash('Invalid email or password!', 'error')
-                    return redirect(url_for('signin
             flash('Account created successfully! Please sign in.', 'success')
             return redirect(url_for('signin'))
         except Exception as e:
@@ -358,12 +288,8 @@ def admin():
         
         html += """
             </table>
-        </body>if USE_SQLITE:
-                    c.execute('INSERT INTO contacts (name, email, message) VALUES (?, ?, ?)',
-                              (name, email, message))
-                else:
-                    c.execute('INSERT INTO contacts (name, email, message) VALUES (%s, %s, %s)',
-            </html>
+        </body>
+        </html>
         """
         
         return html
@@ -519,36 +445,56 @@ def pill_detect():
 
 @app.route('/get-drug-info', methods=['GET','POST'])
 def get_drug_info_route():
-    data = request.form
-    pill_name = data.get('drug_name')
-    system_prompt = (
-        "Format the response in clear sections, with each point on a new line and in bold:\n\n"
-        "1. Uses\n"
-        "[List each use on a new line  with bullet points]\n\n"
-        "2. Dosage Information\n"
-        "[List each dosage detail on a new line with bullet points]\n\n"
-        "3. Side Effects\n"
-        "[List each side effect on a new line with bullet points]\n\n"
-        "4. Safety Information\n"
-        "[List each safety point on a new line with bullet points]\n\n"
-        "Rules:\n"
-        "- Write each point as a complete sentence\n"
-        "- Start each line directly with the information\n"
-        "- Do not use any symbols, bullets, or asterisks\n"
-        "- Keep points sequential and clear"
-    )
-    user_message = (
-        f"Provide Detailed information about {pill_name} in a clear, sequential format. "
-        "Each point should be on its own line without any special characters or formatting."
-    )
+    try:
+        data = request.form
+        pill_name = data.get('drug_name')
+        
+        if not pill_name:
+            flash('Please enter a drug name.', 'error')
+            return redirect(url_for('model'))
+        
+        system_prompt = (
+            "Format the response in clear sections, with each point on a new line and in bold:\n\n"
+            "1. Uses\n"
+            "[List each use on a new line  with bullet points]\n\n"
+            "2. Dosage Information\n"
+            "[List each dosage detail on a new line with bullet points]\n\n"
+            "3. Side Effects\n"
+            "[List each side effect on a new line with bullet points]\n\n"
+            "4. Safety Information\n"
+            "[List each safety point on a new line with bullet points]\n\n"
+            "Rules:\n"
+            "- Write each point as a complete sentence\n"
+            "- Start each line directly with the information\n"
+            "- Do not use any symbols, bullets, or asterisks\n"
+            "- Keep points sequential and clear"
+        )
+        user_message = (
+            f"Provide Detailed information about {pill_name} in a clear, sequential format. "
+            "Each point should be on its own line without any special characters or formatting."
+        )
+        
+        print(f"Fetching drug info for: {pill_name}")
+        gemini_response = get_gemini_response(user_message, system_prompt)
+        print(f"Gemini response received: {gemini_response[:100]}...")
+        
+        # Check for error messages
+        error_keywords = ["error", "configuration error", "API", "contact administrator"]
+        if any(keyword in gemini_response.lower() for keyword in error_keywords):
+            flash(gemini_response, 'error')
+            return redirect(url_for('model'))
+        
+        formatted_response = gemini_response.replace("\n", "<br>")
+        pill_info = {
+            "pill_name": pill_name,
+            "information": formatted_response
+        }
+        return render_template('model.html', pill_info=pill_info)
     
-    gemini_response = get_gemini_response(user_message, system_prompt)
-    formatted_response = gemini_response.replace("\n", "<br>")
-    pill_info = {
-        "pill_name": pill_name,
-        "information": formatted_response
-    }
-    return render_template('model.html', pill_info=pill_info)
+    except Exception as e:
+        print(f"Error in get_drug_info_route: {str(e)}")
+        flash('An error occurred while fetching drug information. Please try again.', 'error')
+        return redirect(url_for('model'))
 
 @app.route('/guide')
 def how_to_use():

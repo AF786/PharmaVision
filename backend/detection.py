@@ -13,10 +13,15 @@ from io import BytesIO
 load_dotenv()
 API_KEY = os.environ.get('ROBOFLOW_API_KEY')
 GEMINI_KEY = os.environ.get('GEMINI_API_KEY')
-print(API_KEY)
+print(f"Roboflow API Key present: {bool(API_KEY)}")
+print(f"Gemini API Key present: {bool(GEMINI_KEY)}")
 
-genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel("gemini-1.5-flash")
+if GEMINI_KEY:
+    genai.configure(api_key=GEMINI_KEY)
+    model = genai.GenerativeModel("gemini-1.5-flash")
+else:
+    print("WARNING: GEMINI_API_KEY not found in environment variables")
+    model = None
 
 def analyze_pill_image(image_data, prompt):
     """
@@ -53,6 +58,11 @@ def analyze_pill_image(image_data, prompt):
 
 def get_gemini_response(user_message, system_prompt):
     try:
+        # Check if model is configured
+        if model is None:
+            print("ERROR: Gemini model not configured - API key missing")
+            return "Service configuration error. Please contact administrator."
+        
         # Add timeout handling
         start_time = time.time()
         timeout = 10  # 10 seconds timeout
@@ -80,10 +90,18 @@ def get_gemini_response(user_message, system_prompt):
         return "No response generated"
 
     except Exception as e:
-        print(f"Error from Gemini API: {e}")
-        if "rate limit" in str(e).lower():
+        error_msg = str(e)
+        print(f"Error from Gemini API: {error_msg}")
+        
+        # More specific error handling
+        if "API_KEY" in error_msg or "API key" in error_msg:
+            return "API configuration error. Please contact administrator."
+        elif "rate limit" in error_msg.lower() or "quota" in error_msg.lower():
             return "Service is busy. Please try again in a moment."
-        return "There was an error processing your request."
+        elif "SAFETY" in error_msg or "blocked" in error_msg.lower():
+            return "Request could not be processed due to safety filters."
+        else:
+            return f"There was an error processing your request: {error_msg}"
 
 def get_drug_info(pill_name):
     system_prompt = (
