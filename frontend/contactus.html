@@ -31,6 +31,10 @@
           <a href="/contact" class="navlink">Contact</a>
           <a href="/model" class="navlink">Model</a>
           <a href="/chatbot" class="navlink">Chat</a>
+          <a href="/skin" class="navlink">Skin</a>
+          {% if session.get('is_admin') %}
+            <a href="/admin/dashboard" class="navlink" style="color: #ffd700; font-weight: 600;">Admin</a>
+          {% endif %}
           {% if session.get('user_id') %}
             <a href="/logout" class="navlink">Logout</a>
           {% else %}

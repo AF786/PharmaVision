@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PharmaVision | Setup Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+    <link rel="icon" href="{{url_for('static', filename='img/logo.png')}}" type="image/x-icon" />
+    <style>
+        .setup-container {
+            max-width: 500px;
+            margin: 100px auto;
+            padding: 40px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        }
+
+        .setup-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .setup-header h1 {
+            color: #14967f;
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .setup-header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #14967f;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 14px;
+            background: #14967f;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .submit-btn:hover {
+            background: #0d6b5c;
+        }
+
+        .info-box {
+            background: #f0f9f7;
+            border-left: 4px solid #14967f;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            font-size: 14px;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div id="preloader"></div>
+
+    <div class="setup-container">
+        <div class="setup-header">
+            <h1>🛡️ Setup First Admin</h1>
+            <p>Create the first admin account for your PharmaVision application</p>
+        </div>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}" style="padding: 15px; margin-bottom: 20px; border-radius: 8px; {% if category == 'error' %}background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;{% else %}background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="info-box">
+            <strong>ℹ️ Instructions:</strong>
+            <ol style="margin: 10px 0 0 20px; padding: 0;">
+                <li>First, register a user account through the normal signup process</li>
+                <li>Enter that user's email address below</li>
+                <li>Provide the secret setup key</li>
+                <li>Submit to grant admin privileges</li>
+            </ol>
+        </div>
+
+        <div class="warning-box">
+            <strong>⚠️ Security Note:</strong> This page should only be used for initial setup. The default setup key is <code>pharma-setup-2026</code>. Set the <code>ADMIN_SETUP_KEY</code> environment variable to use a custom key.
+        </div>
+
+        <form method="POST">
+            <div class="form-group">
+                <label for="email">User Email Address</label>
+                <input type="email" id="email" name="email" placeholder="user@example.com" required />
+            </div>
+
+            <div class="form-group">
+                <label for="secret_key">Setup Secret Key</label>
+                <input type="password" id="secret_key" name="secret_key" placeholder="Enter setup key" required />
+            </div>
+
+            <button type="submit" class="submit-btn">Create Admin User</button>
+        </form>
+
+        <div style="text-align: center; margin-top: 20px;">
+            <a href="/" style="color: #14967f; text-decoration: none;">← Back to Home</a>
+        </div>
+    </div>
+
+    <script>
+        var loader = document.getElementById("preloader");
+        setTimeout(function () {
+            loader.style.display = "none";
+        }, 1000);
+    </script>
+</body>
+</html>

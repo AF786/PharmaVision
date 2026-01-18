@@ -77,6 +77,7 @@ def init_db():
                 name TEXT NOT NULL,
                 email TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL,
+                is_admin BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -106,6 +107,37 @@ def login_required(f):
         if 'user_id' not in session:
             flash('Please sign in to access this page.', 'error')
             return redirect(url_for('signin'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Admin required decorator
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Please sign in to access this page.', 'error')
+            return redirect(url_for('signin'))
+        
+        # Check if user is admin
+        try:
+            conn = get_db_connection()
+            if conn:
+                c = conn.cursor()
+                c.execute('SELECT is_admin FROM users WHERE id = %s', (session['user_id'],))
+                user = c.fetchone()
+                conn.close()
+                
+                if not user or not user['is_admin']:
+                    flash('Access denied. Admin privileges required.', 'error')
+                    return redirect(url_for('index'))
+            else:
+                flash('Database connection error.', 'error')
+                return redirect(url_for('index'))
+        except Exception as e:
+            print(f"Error checking admin status: {e}")
+            flash('An error occurred. Please try again.', 'error')
+            return redirect(url_for('index'))
+        
         return f(*args, **kwargs)
     return decorated_function
 
@@ -214,6 +246,7 @@ def signin():
                 session['user_id'] = user['id']
                 session['user_name'] = user['name']
                 session['user_email'] = user['email']
+                session['is_admin'] = user.get('is_admin', False)
                 flash(f'Welcome back, {user["name"]}!', 'success')
                 return redirect(url_for('index'))
             else:
@@ -231,6 +264,127 @@ def logout():
     session.clear()
     flash('You have been logged out successfully.', 'success')
     return redirect(url_for('signin'))
+
+@app.route('/admin/dashboard')
+@admin_required
+def admin_dashboard():
+    try:
+        conn = get_db_connection()
+        if not conn:
+            flash('Database connection error.', 'error')
+            return redirect(url_for('index'))
+        
+        c = conn.cursor()
+        
+        # Get all users
+        c.execute('''
+            SELECT id, name, email, is_admin, created_at 
+            FROM users 
+            ORDER BY created_at DESC
+        ''')
+        users = c.fetchall()
+        
+        # Get all contacts
+        c.execute('''
+            SELECT id, name, email, message, created_at 
+            FROM contacts 
+            ORDER BY created_at DESC
+        ''')
+        contacts = c.fetchall()
+        
+        conn.close()
+        
+        return render_template('admin_dashboard.html', users=users, contacts=contacts)
+    
+    except Exception as e:
+        print(f"Error in admin dashboard: {str(e)}")
+        flash('An error occurred while loading the dashboard.', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/admin/make-admin/<int:user_id>', methods=['POST'])
+@admin_required
+def make_admin(user_id):
+    """Route to promote a user to admin"""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            flash('Database connection error.', 'error')
+            return redirect(url_for('admin_dashboard'))
+        
+        c = conn.cursor()
+        c.execute('UPDATE users SET is_admin = TRUE WHERE id = %s', (user_id,))
+        conn.commit()
+        
+        # Get user name for the flash message
+        c.execute('SELECT name FROM users WHERE id = %s', (user_id,))
+        user = c.fetchone()
+        conn.close()
+        
+        if user:
+            flash(f'{user["name"]} has been promoted to admin!', 'success')
+        else:
+            flash('User promoted to admin!', 'success')
+        
+    except Exception as e:
+        print(f"Error promoting user: {str(e)}")
+        flash('An error occurred while promoting the user.', 'error')
+    
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/setup-first-admin', methods=['GET', 'POST'])
+def setup_first_admin():
+    """One-time setup route to create the first admin user"""
+    # Check if any admin exists
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return "Database connection error", 500
+        
+        c = conn.cursor()
+        c.execute('SELECT COUNT(*) as count FROM users WHERE is_admin = TRUE')
+        result = c.fetchone()
+        
+        if result['count'] > 0:
+            conn.close()
+            flash('Admin users already exist.', 'error')
+            return redirect(url_for('index'))
+        
+        if request.method == 'POST':
+            email = request.form.get('email')
+            secret_key = request.form.get('secret_key')
+            
+            # Use environment variable for security
+            expected_key = os.environ.get('ADMIN_SETUP_KEY', 'pharma-setup-2026')
+            
+            if secret_key != expected_key:
+                flash('Invalid setup key!', 'error')
+                return render_template('setup_admin.html')
+            
+            if not email:
+                flash('Email is required!', 'error')
+                return render_template('setup_admin.html')
+            
+            # Make the user an admin
+            c.execute('UPDATE users SET is_admin = TRUE WHERE email = %s', (email,))
+            conn.commit()
+            
+            if c.rowcount > 0:
+                flash('Admin user created successfully! Please sign in.', 'success')
+                conn.close()
+                return redirect(url_for('signin'))
+            else:
+                flash('User with that email not found. Please register first.', 'error')
+                conn.close()
+                return render_template('setup_admin.html')
+        
+        conn.close()
+        return render_template('setup_admin.html')
+    
+    except Exception as e:
+        print(f"Error in setup admin: {str(e)}")
+        return f"An error occurred: {str(e)}", 500
+        flash('An error occurred while loading the dashboard.', 'error')
+        return redirect(url_for('index'))
 
 @app.route('/admin-dashboard-secret')
 def admin():

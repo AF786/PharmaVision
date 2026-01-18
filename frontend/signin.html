@@ -24,6 +24,10 @@
         <div class="navlinks">
           <a href="/" class="navlink">Home</a>
           <a href="/about" class="navlink">About Us</a>
+          <a href="/skin" class="navlink">Skin</a>
+          {% if session.get('is_admin') %}
+            <a href="/admin/dashboard" class="navlink" style="color: #ffd700; font-weight: 600;">Admin</a>
+          {% endif %}
           <a href="/signin" class="navlink">Sign In</a>
           <a href="/signup" class="navlink">Sign Up</a>
         </div>
