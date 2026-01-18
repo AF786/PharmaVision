@@ -65,8 +65,7 @@
             <h1>Search Medicine</h1>
             <p style="text-align: center">
               Experience hassle-free medication management with our dedicated
-              services. Let us handle your medicines, ensuring you receive the
-              care and attention your health deserves.
+              services. Search for medicines or diseases to get comprehensive health information.
             </p>
             <br /><br />
            
@@ -85,7 +84,7 @@
               <form id="drugSearchForm" action="/get-drug-info" method="post">
                 <input
                   type="text"
-                  placeholder="Search medicine..."
+                  placeholder="Search medicine or disease..."
                   class="search-in"
                   id="drugInput"
                   name="drug_name"
@@ -99,11 +98,25 @@
                 </button>
               </form>
             </div>
-            <div class="results" id="results" style="{% if pill_info %}display: block; background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); padding: 25px; margin-top: 20px;{% else %}display: none;{% endif %}">
+            <div class="results" id="results" style="{% if pill_info %}display: block; background: white; border-radius: 15px; box-shadow: 0 8px 16px rgba(0,0,0,0.1); padding: 30px; margin-top: 30px; max-width: 900px; margin-left: auto; margin-right: auto;{% else %}display: none;{% endif %}">
               {% if pill_info %}
-              <h2 style="color: #14967f; font-size: 28px; margin-bottom: 20px;">{{ pill_info.pill_name }}</h2>
-              <div style="line-height: 1.8; font-size: 16px; color: #333;">
+              <div style="border-bottom: 3px solid #14967f; padding-bottom: 15px; margin-bottom: 25px;">
+                <h2 style="color: #14967f; font-size: 32px; margin: 0; font-weight: 600;">{{ pill_info.pill_name }}</h2>
+                <p style="color: #666; margin-top: 8px; font-size: 14px;">
+                  {% if pill_info.type == 'disease' %}
+                    Disease Information
+                  {% else %}
+                    Medication Information
+                  {% endif %}
+                </p>
+              </div>
+              <div class="info-content" style="line-height: 1.8; font-size: 16px; color: #333;">
                 {{ pill_info.information|safe }}
+              </div>
+              <div style="margin-top: 30px; padding: 20px; background: #f0f9f7; border-left: 4px solid #14967f; border-radius: 8px;">
+                <p style="margin: 0; font-size: 14px; color: #555;">
+                  <strong>⚕️ Medical Disclaimer:</strong> This information is for educational purposes only. Always consult with a qualified healthcare professional before starting any treatment or medication.
+                </p>
               </div>
               {% endif %}
             </div>
@@ -161,10 +174,25 @@
 
         // Show loading state
         resultsContainer.style.display = 'block';
-        resultsContainer.innerHTML = '<div class="loading" style="text-align: center; padding: 20px; color: #14967f; font-size: 18px;">Loading drug information...</div>';
+        resultsContainer.innerHTML = '<div class="loading" style="text-align: center; padding: 20px; color: #14967f; font-size: 18px;"><div style="border: 4px solid #f3f3f3; border-top: 4px solid #14967f; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px;"></div>Loading information...</div>';
 
-        // Submit the form normally to get the full page reload with results
-        document.getElementById("drugSearchForm").submit();
+        // Common disease keywords to help detect if it's a disease search
+        const diseaseKeywords = ['disease', 'syndrome', 'disorder', 'infection', 'condition', 'illness', 
+                                 'osis', 'itis', 'diabetes', 'cancer', 'leprosy', 'malaria', 'tuberculosis',
+                                 'pneumonia', 'asthma', 'arthritis', 'hepatitis', 'covid', 'flu', 'fever',
+                                 'hypertension', 'alzheimer', 'parkinson'];
+        
+        // Check if the search term is likely a disease
+        const searchLower = pillName.toLowerCase();
+        const isDisease = diseaseKeywords.some(keyword => searchLower.includes(keyword));
+        
+        // Set the appropriate endpoint
+        const endpoint = isDisease ? '/get-disease-info' : '/get-drug-info';
+        
+        // Create form and submit
+        const form = document.getElementById("drugSearchForm");
+        form.action = endpoint;
+        form.submit();
       });
 
       // Scroll to results if they exist on page load

@@ -454,24 +454,47 @@ def get_drug_info_route():
             return redirect(url_for('model'))
         
         system_prompt = (
-            "Format the response in clear sections, with each point on a new line and in bold:\n\n"
-            "1. Uses\n"
-            "[List each use on a new line  with bullet points]\n\n"
-            "2. Dosage Information\n"
-            "[List each dosage detail on a new line with bullet points]\n\n"
-            "3. Side Effects\n"
-            "[List each side effect on a new line with bullet points]\n\n"
-            "4. Safety Information\n"
-            "[List each safety point on a new line with bullet points]\n\n"
+            "You are a medical information assistant. Provide comprehensive drug information in this exact HTML format:\n\n"
+            "<div class='info-section'>\n"
+            "<h3>💊 Overview</h3>\n"
+            "<p>[Brief description of the drug and its primary purpose]</p>\n"
+            "</div>\n\n"
+            "<div class='info-section'>\n"
+            "<h3>✅ Uses</h3>\n"
+            "<ul>\n"
+            "<li>[Use 1]</li>\n"
+            "<li>[Use 2]</li>\n"
+            "</ul>\n"
+            "</div>\n\n"
+            "<div class='info-section'>\n"
+            "<h3>📋 Dosage Information</h3>\n"
+            "<ul>\n"
+            "<li>[Dosage detail 1]</li>\n"
+            "<li>[Dosage detail 2]</li>\n"
+            "</ul>\n"
+            "</div>\n\n"
+            "<div class='info-section'>\n"
+            "<h3>⚠️ Side Effects</h3>\n"
+            "<ul>\n"
+            "<li>[Side effect 1]</li>\n"
+            "<li>[Side effect 2]</li>\n"
+            "</ul>\n"
+            "</div>\n\n"
+            "<div class='info-section'>\n"
+            "<h3>🛡️ Safety Information</h3>\n"
+            "<ul>\n"
+            "<li>[Safety point 1]</li>\n"
+            "<li>[Safety point 2]</li>\n"
+            "</ul>\n"
+            "</div>\n\n"
             "Rules:\n"
-            "- Write each point as a complete sentence\n"
-            "- Start each line directly with the information\n"
-            "- Do not use any symbols, bullets, or asterisks\n"
-            "- Keep points sequential and clear"
+            "- Use ONLY the HTML structure provided above\n"
+            "- Include proper <div>, <h3>, <ul>, <li>, and <p> tags\n"
+            "- Keep information clear and concise\n"
+            "- Do not add any markdown or extra formatting"
         )
         user_message = (
-            f"Provide Detailed information about {pill_name} in a clear, sequential format. "
-            "Each point should be on its own line without any special characters or formatting."
+            f"Provide detailed information about the medication '{pill_name}' using the HTML format specified."
         )
         
         print(f"Fetching drug info for: {pill_name}")
@@ -484,16 +507,97 @@ def get_drug_info_route():
             flash(gemini_response, 'error')
             return redirect(url_for('model'))
         
-        formatted_response = gemini_response.replace("\n", "<br>")
         pill_info = {
             "pill_name": pill_name,
-            "information": formatted_response
+            "information": gemini_response,
+            "type": "drug"
         }
         return render_template('model.html', pill_info=pill_info)
     
     except Exception as e:
         print(f"Error in get_drug_info_route: {str(e)}")
         flash('An error occurred while fetching drug information. Please try again.', 'error')
+        return redirect(url_for('model'))
+
+@app.route('/get-disease-info', methods=['GET','POST'])
+def get_disease_info_route():
+    try:
+        data = request.form
+        disease_name = data.get('drug_name')  # Using same input field name for compatibility
+        
+        if not disease_name:
+            flash('Please enter a disease name.', 'error')
+            return redirect(url_for('model'))
+        
+        system_prompt = (
+            "You are a medical information assistant. Provide comprehensive disease information in this exact HTML format:\n\n"
+            "<div class='info-section'>\n"
+            "<h3>📖 About</h3>\n"
+            "<p>[Clear description of what the disease is, including its medical name and common understanding]</p>\n"
+            "</div>\n\n"
+            "<div class='info-section'>\n"
+            "<h3>🔍 Symptoms</h3>\n"
+            "<ul>\n"
+            "<li>[Symptom 1]</li>\n"
+            "<li>[Symptom 2]</li>\n"
+            "</ul>\n"
+            "</div>\n\n"
+            "<div class='info-section'>\n"
+            "<h3>🦠 Causes</h3>\n"
+            "<ul>\n"
+            "<li>[Cause 1]</li>\n"
+            "<li>[Cause 2]</li>\n"
+            "</ul>\n"
+            "</div>\n\n"
+            "<div class='info-section'>\n"
+            "<h3>💊 Treatment Options</h3>\n"
+            "<ul>\n"
+            "<li>[Treatment 1]</li>\n"
+            "<li>[Treatment 2]</li>\n"
+            "</ul>\n"
+            "</div>\n\n"
+            "<div class='info-section'>\n"
+            "<h3>🛡️ Prevention</h3>\n"
+            "<ul>\n"
+            "<li>[Prevention method 1]</li>\n"
+            "<li>[Prevention method 2]</li>\n"
+            "</ul>\n"
+            "</div>\n\n"
+            "<div class='info-section alert'>\n"
+            "<h3>⚠️ When to See a Doctor</h3>\n"
+            "<p>[Guidance on when medical attention is necessary]</p>\n"
+            "</div>\n\n"
+            "Rules:\n"
+            "- Use ONLY the HTML structure provided above\n"
+            "- Include proper <div>, <h3>, <ul>, <li>, and <p> tags\n"
+            "- Keep information clear, accurate, and helpful\n"
+            "- Do not add any markdown or extra formatting"
+        )
+        user_message = (
+            f"Provide comprehensive medical information about '{disease_name}' using the HTML format specified. "
+            "Include accurate medical information while keeping it understandable."
+        )
+        
+        print(f"Fetching disease info for: {disease_name}")
+        gemini_response = get_gemini_response(user_message, system_prompt)
+        print(f"Gemini response received: {gemini_response[:100]}...")
+        
+        # Check for error messages
+        error_keywords = ["error", "configuration error", "API", "contact administrator"]
+        if any(keyword in gemini_response.lower() for keyword in error_keywords):
+            flash(gemini_response, 'error')
+            return redirect(url_for('model'))
+        
+        pill_info = {
+            "pill_name": disease_name,
+            "information": gemini_response,
+            "type": "disease"
+        }
+        return render_template('model.html', pill_info=pill_info)
+    
+    except Exception as e:
+        print(f"Error in get_disease_info_route: {str(e)}")
+        flash('An error occurred while fetching disease information. Please try again.', 'error')
         return redirect(url_for('model'))
 
 @app.route('/guide')
