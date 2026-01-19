@@ -331,61 +331,6 @@ def make_admin(user_id):
     
     return redirect(url_for('admin_dashboard'))
 
-@app.route('/setup-first-admin', methods=['GET', 'POST'])
-def setup_first_admin():
-    """One-time setup route to create the first admin user"""
-    # Check if any admin exists
-    try:
-        conn = get_db_connection()
-        if not conn:
-            return "Database connection error", 500
-        
-        c = conn.cursor()
-        c.execute('SELECT COUNT(*) as count FROM users WHERE is_admin = TRUE')
-        result = c.fetchone()
-        
-        if result['count'] > 0:
-            conn.close()
-            flash('Admin users already exist.', 'error')
-            return redirect(url_for('index'))
-        
-        if request.method == 'POST':
-            email = request.form.get('email')
-            secret_key = request.form.get('secret_key')
-            
-            # Use environment variable for security
-            expected_key = os.environ.get('ADMIN_SETUP_KEY', 'pharma-setup-2026')
-            
-            if secret_key != expected_key:
-                flash('Invalid setup key!', 'error')
-                return render_template('setup_admin.html')
-            
-            if not email:
-                flash('Email is required!', 'error')
-                return render_template('setup_admin.html')
-            
-            # Make the user an admin
-            c.execute('UPDATE users SET is_admin = TRUE WHERE email = %s', (email,))
-            conn.commit()
-            
-            if c.rowcount > 0:
-                flash('Admin user created successfully! Please sign in.', 'success')
-                conn.close()
-                return redirect(url_for('signin'))
-            else:
-                flash('User with that email not found. Please register first.', 'error')
-                conn.close()
-                return render_template('setup_admin.html')
-        
-        conn.close()
-        return render_template('setup_admin.html')
-    
-    except Exception as e:
-        print(f"Error in setup admin: {str(e)}")
-        return f"An error occurred: {str(e)}", 500
-        flash('An error occurred while loading the dashboard.', 'error')
-        return redirect(url_for('index'))
-
 @app.route('/admin-dashboard-secret')
 def admin():
     # Simple password protection - you can enhance this
