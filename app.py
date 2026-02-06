@@ -37,14 +37,22 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg','webp' }
 app.config['MAX_CONTENT_LENGTH']= 16*1024*1024
 
 # Add these configurations after creating the Flask app
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 587
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
 app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USE_SSL'] = False
 app.config['MAIL_USERNAME'] = os.environ.get('SENDER_EMAIL')
 app.config['MAIL_PASSWORD'] = os.environ.get('SENDER_PASSWORD')
 app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('SENDER_EMAIL')
 
 mail = Mail(app)
+
+# Print email configuration status (without exposing passwords)
+print(f"Email Configuration:")
+print(f"  MAIL_SERVER: {app.config['MAIL_SERVER']}")
+print(f"  MAIL_PORT: {app.config['MAIL_PORT']}")
+print(f"  SENDER_EMAIL configured: {bool(app.config['MAIL_USERNAME'])}")
+print(f"  SENDER_PASSWORD configured: {bool(app.config['MAIL_PASSWORD'])}")
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
@@ -429,38 +437,50 @@ def submit_form():
         except Exception as db_error:
             print(f"Database error: {str(db_error)}")
 
-        # Try to send email (optional)
+        # Try to send email using Flask-Mail
         try:
             recipient = os.environ.get('RECIPIENT_EMAIL')
-            sender_email = os.environ.get('SENDER_EMAIL')
-            sender_password = os.environ.get('SENDER_PASSWORD')
             
-            if all([recipient, sender_email, sender_password]):
-                subject = f"New Contact Form Submission from {name}"
-                body = f"""
-                New contact form submission:
-                
-                Name: {name}
-                Email: {email}
-                Message: {message}
-                """
-
-                msg = MIMEMultipart()
-                msg['From'] = sender_email
-                msg['To'] = recipient
-                msg['Subject'] = subject
-                msg.attach(MIMEText(body, 'plain'))
-
-                server = smtplib.SMTP('smtp.gmail.com', 587)
-                server.starttls()
-                server.login(sender_email, sender_password)
-                server.send_message(msg)
-                server.quit()
-                print("Email sent successfully")
+            if not all([recipient, app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD']]):
+                print("⚠️ Email credentials not fully configured - contact saved to DB only")
+                print(f"  RECIPIENT_EMAIL: {bool(recipient)}")
+                print(f"  SENDER_EMAIL: {bool(app.config['MAIL_USERNAME'])}")
+                print(f"  SENDER_PASSWORD: {bool(app.config['MAIL_PASSWORD'])}")
             else:
-                print("Email credentials not configured - skipping email")
+                print(f"Attempting to send email to {recipient}...")
+                
+                # Use Flask-Mail for better compatibility
+                msg = Message(
+                    subject=f"New Contact Form - {name}",
+                    sender=app.config['MAIL_DEFAULT_SENDER'],
+                    recipients=[recipient]
+                )
+                msg.body = f"""
+New contact form submission from PharmaVision:
+
+Name: {name}
+Email: {email}
+
+Message:
+{message}
+
+---
+This message was sent via the PharmaVision contact form.
+"""
+                
+                mail.send(msg)
+                print("✓ Email sent successfully!")
+                
         except Exception as email_error:
-            print(f"Email error (contact saved to DB): {str(email_error)}")
+            print(f"❌ Email sending failed: {str(email_error)}")
+            print(f"Error type: {type(email_error).__name__}")
+            import traceback
+            traceback.print_exc()
+            print("\n💡 Troubleshooting tips:")
+            print("  1. Make sure you're using a Gmail App Password (not regular password)")
+            print("  2. Enable 2-Factor Authentication on Gmail")
+            print("  3. Generate App Password: https://myaccount.google.com/apppasswords")
+            print("  4. Check SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL in .env")
 
         flash('Your message has been successfully submitted!', 'success')
         return redirect('/contact')
@@ -487,55 +507,43 @@ def pill_detect():
         if not file.filename.lower().endswith(tuple(ALLOWED_EXTENSIONS)):
             return jsonify({"error": "Invalid file type. Please upload an image (PNG, JPG, JPEG, WEBP)"}), 400
 
-        print("Received request for pill detection")
+        print("📸 Received pill image - Using Gemini Vision")
+        
         try:
-            # Initialize Roboflow with API key
-            rf = Roboflow(api_key=API_KEY)
-            project = rf.workspace().project("pill-recognition-oxvel")
-            model = project.version(1).model
-
-            # Validate if the model was successfully loaded
-            if model is None:
-                return jsonify({"error": "Model failed to load."}), 500
+            from backend.scraper import google_lens_search
+            
+            # Read image bytes
+            image_bytes = file.read()
+            
+            # Use Gemini Vision API (no billing required)
+            print("Analyzing with Gemini Vision...")
+            pill_result = google_lens_search(image_bytes)
+            
+            if pill_result:
+                print(f"✓ Found: {pill_result['pill_name']}")
+                return jsonify({
+                    "pill_name": pill_result['pill_name'],
+                    "dosage": pill_result.get('dosage', 'See product info'),
+                    "source": pill_result['source']
+                })
             else:
-                print("Model loaded:", model)
-
-            # Check if file is included in the request
-            if 'file' not in request.files:
-                print("No file part in the request.")
-                return jsonify({"error": "No file part in the request."}), 400
-
-            file = request.files['file']
-
-            # Ensure the file has a valid name
-            if file.filename == '':
-                print("No selected file.")
-                return jsonify({"error": "No selected file."}), 400
-
-            # Try to open and process the image
-            try:
-                image = Image.open(BytesIO(file.read()))
-                print("Image opened successfully")  # Check if the image is opened
-                # Convert the PIL image to a format that the model can work with
-                image_np = np.array(image)  # Convert to a NumPy array
-                # Make the prediction
-                result = model.predict(image_np, confidence=10, overlap=30).json()
-                if 'predictions' in result and result['predictions']:
-                    pill_name = result['predictions'][0]['class']
-                    return jsonify({
-                        "pill_name": pill_name,
-                    })
-                else:
-                    print("No pill detected.")
-                    return jsonify({"error": "No pill detected."}), 400
-
-            except Exception as e:
-                print("Image processing error:", str(e))
-                return jsonify({"error": f"Image processing error: {str(e)}"}), 500
+                print("Could not identify pill")
+                return jsonify({
+                    "error": "Could not identify pill",
+                    "suggestions": [
+                        "Make sure GEMINI_API_KEY is set in .env file",
+                        "Ensure the pill image is clear and well-lit",
+                        "Try taking a photo with the pill imprint clearly visible",
+                        "Or try manual search below with pill imprint"
+                    ]
+                }), 400
 
         except Exception as e:
-            print("Internal server error:", str(e))
-            return jsonify({"error": f"Internal server error: {str(e)}"}), 500
+            print(f"Error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({"error": f"Error: {str(e)}"}), 500
+            
     except Exception as e:
         print(f"Server error: {str(e)}")
         return jsonify({
