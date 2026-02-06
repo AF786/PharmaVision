@@ -52,106 +52,74 @@ def google_lens_search(image_bytes):
         model = genai.GenerativeModel('gemini-2.5-flash')
         
         prompt = """
-You are a pill imprint extraction specialist. Your ONLY job is to find and extract text/numbers from the pill.
+You are a pharmaceutical expert specializing in pill identification. Analyze this pill/medication image and identify it.
 
-DO NOT try to identify the medication. ONLY extract what you see.
+TASK: Identify the medication by examining:
+1. Imprint codes (numbers, letters, or text on the pill surface)
+2. Shape (round, oval, oblong, capsule, etc.)
+3. Color and appearance
+4. Size and distinctive features
+5. Brand name if visible
 
-TASK: Find the IMPRINT CODE
-Look carefully at the pill surface for:
-- Numbers (e.g., "770", "44", "500", "93")
-- Letters + Numbers (e.g., "L484", "IP109", "M30", "A215")
-- Text (e.g., "TYLENOL", "ADVIL", "BAYER")
-- Symbols or logos
+Provide your identification in this exact format:
 
-Check BOTH sides of the pill if visible.
-Report EXACTLY what you see - no interpretation, no guessing.
+Medication Name: [Full generic name or brand name]
+Dosage: [Strength like 500mg, 10mg, etc., or "Unknown" if not determinable]
+Imprint: [Text/numbers visible on pill, or "None visible"]
+Description: [Brief description of physical appearance]
 
-OUTPUT FORMAT:
-Imprint: [exact text/numbers you see, or "NONE" if nothing visible]
-Shape: [round/oval/oblong/capsule]
-Color: [color]
+If you can identify the medication with reasonable confidence, provide the name.
+If you cannot confidently identify it, state "Unknown" for Medication Name but still describe what you see.
 
-Example outputs:
-Imprint: 770
-Shape: Round
-Color: White
-
-Imprint: L484
-Shape: Oblong
-Color: White
-
-Imprint: NONE
-Shape: Round
-Color: Blue
+Be specific and accurate. Use your knowledge of common medications and their appearances.
 """
         
         response = model.generate_content([prompt, image])
         
         if response and response.text:
             result_text = response.text
-            print(f"✓ Gemini Vision extracted:\n{result_text}")
+            print(f"✓ Gemini Vision identified:\n{result_text}")
             
-            # Parse the imprint
+            # Parse the response
+            med_name_match = re.search(r'Medication Name:\s*([^\n]+)', result_text, re.IGNORECASE)
+            dosage_match = re.search(r'Dosage:\s*([^\n]+)', result_text, re.IGNORECASE)
             imprint_match = re.search(r'Imprint:\s*([^\n]+)', result_text, re.IGNORECASE)
-            shape_match = re.search(r'Shape:\s*([^\n]+)', result_text, re.IGNORECASE)
-            color_match = re.search(r'Color:\s*([^\n]+)', result_text, re.IGNORECASE)
+            desc_match = re.search(r'Description:\s*([^\n]+)', result_text, re.IGNORECASE)
             
-            imprint = imprint_match.group(1).strip() if imprint_match else None
-            shape = shape_match.group(1).strip() if shape_match else "Unknown"
-            color = color_match.group(1).strip() if color_match else "Unknown"
+            medication_name = med_name_match.group(1).strip() if med_name_match else "Unknown"
+            dosage = dosage_match.group(1).strip() if dosage_match else "Unknown"
+            imprint = imprint_match.group(1).strip() if imprint_match else "None visible"
+            description = desc_match.group(1).strip() if desc_match else ""
             
-            print(f"Extracted - Imprint: '{imprint}', Shape: {shape}, Color: {color}")
+            print(f"Identified - Medication: '{medication_name}', Dosage: {dosage}, Imprint: {imprint}")
             
-            # Search local database for accurate results
-            if imprint and imprint.upper() not in ['NONE', 'UNKNOWN', 'NOT VISIBLE', 'NO VISIBLE IMPRINT']:
-                clean_imprint = imprint.strip().upper()
+            # Check if identification was successful
+            if medication_name and medication_name.upper() not in ['UNKNOWN', 'CANNOT IDENTIFY', 'NOT IDENTIFIABLE', 'UNCLEAR']:
+                # Successfully identified
+                source_info = f"Imprint: {imprint}" if imprint != "None visible" else "Visual identification"
                 
-                # Check exact match in local database
-                if clean_imprint in COMMON_IMPRINTS:
-                    pill_data = COMMON_IMPRINTS[clean_imprint]
-                    pill_name = f"{pill_data['name']}"
-                    if pill_data['brand'] and pill_data['brand'] != 'Generic':
-                        pill_name += f" ({pill_data['brand']})"
-                    
-                    print(f"✓ Found in local database: {pill_name} {pill_data['dosage']}")
-                    return {
-                        'pill_name': pill_name,
-                        'dosage': pill_data['dosage'],
-                        'source': f'Imprint: {imprint}'
-                    }
-                
-                # Try partial matches
-                for word in imprint.split():
-                    if len(word) >= 2:
-                        for db_imprint, pill_data in COMMON_IMPRINTS.items():
-                            if word.upper() in db_imprint or db_imprint in word.upper():
-                                pill_name = f"{pill_data['name']}"
-                                if pill_data['brand'] and pill_data['brand'] != 'Generic':
-                                    pill_name += f" ({pill_data['brand']})"
-                                
-                                print(f"✓ Partial match in database: {pill_name} {pill_data['dosage']}")
-                                return {
-                                    'pill_name': pill_name,
-                                    'dosage': pill_data['dosage'],
-                                    'source': f'Imprint: {imprint}'
-                                }
-                
-                # If not in database, try online search
-                print(f"🔍 Imprint '{imprint}' not in local database, trying online search...")
-                drugs_result = search_drugs_com_imprint(imprint)
-                if drugs_result:
-                    print(f"✓ Found online: {drugs_result['pill_name']}")
-                    return drugs_result
-                
-                # Return what we found even if not identified
+                print(f"✓ Successfully identified: {medication_name}")
                 return {
-                    'pill_name': f"Unknown - Imprint: {imprint}",
-                    'dosage': f"Shape: {shape}, Color: {color}",
-                    'source': 'Gemini Vision'
+                    'pill_name': medication_name,
+                    'dosage': dosage,
+                    'source': source_info
                 }
             else:
-                print("⚠ No imprint detected on pill")
-                return None
+                # Could not identify, but try online search if imprint is available
+                if imprint and imprint.upper() not in ['NONE', 'UNKNOWN', 'NOT VISIBLE', 'NO VISIBLE IMPRINT', 'NONE VISIBLE']:
+                    print(f"🔍 Medication not identified, trying online search with imprint '{imprint}'...")
+                    drugs_result = search_drugs_com_imprint(imprint)
+                    if drugs_result:
+                        print(f"✓ Found online: {drugs_result['pill_name']}")
+                        return drugs_result
+                
+                # Return description if identification failed
+                print("⚠ Could not identify medication")
+                return {
+                    'pill_name': f"Unknown Medication",
+                    'dosage': description if description else "Unable to identify",
+                    'source': f'Imprint: {imprint}' if imprint != "None visible" else 'No imprint visible'
+                }
         
         return None
         
