@@ -507,43 +507,55 @@ def pill_detect():
         if not file.filename.lower().endswith(tuple(ALLOWED_EXTENSIONS)):
             return jsonify({"error": "Invalid file type. Please upload an image (PNG, JPG, JPEG, WEBP)"}), 400
 
-        print("📸 Received pill image - Using Gemini Vision")
-        
+        print("Received request for pill detection")
         try:
-            from backend.scraper import google_lens_search
-            
-            # Read image bytes
-            image_bytes = file.read()
-            
-            # Use Gemini Vision API (no billing required)
-            print("Analyzing with Gemini Vision...")
-            pill_result = google_lens_search(image_bytes)
-            
-            if pill_result:
-                print(f"✓ Found: {pill_result['pill_name']}")
-                return jsonify({
-                    "pill_name": pill_result['pill_name'],
-                    "dosage": pill_result.get('dosage', 'See product info'),
-                    "source": pill_result['source']
-                })
+            # Initialize Roboflow with API key
+            rf = Roboflow(api_key=API_KEY)
+            project = rf.workspace().project("pill-recognition-oxvel")
+            model = project.version(1).model
+
+            # Validate if the model was successfully loaded
+            if model is None:
+                return jsonify({"error": "Model failed to load."}), 500
             else:
-                print("Could not identify pill")
-                return jsonify({
-                    "error": "Could not identify pill",
-                    "suggestions": [
-                        "Make sure GEMINI_API_KEY is set in .env file",
-                        "Ensure the pill image is clear and well-lit",
-                        "Try taking a photo with the pill imprint clearly visible",
-                        "Or try manual search below with pill imprint"
-                    ]
-                }), 400
+                print("Model loaded:", model)
+
+            # Check if file is included in the request
+            if 'file' not in request.files:
+                print("No file part in the request.")
+                return jsonify({"error": "No file part in the request."}), 400
+
+            file = request.files['file']
+
+            # Ensure the file has a valid name
+            if file.filename == '':
+                print("No selected file.")
+                return jsonify({"error": "No selected file."}), 400
+
+            # Try to open and process the image
+            try:
+                image = Image.open(BytesIO(file.read()))
+                print("Image opened successfully")
+                # Convert the PIL image to a format that the model can work with
+                image_np = np.array(image)  # Convert to a NumPy array
+                # Make the prediction
+                result = model.predict(image_np, confidence=10, overlap=30).json()
+                if 'predictions' in result and result['predictions']:
+                    pill_name = result['predictions'][0]['class']
+                    return jsonify({
+                        "pill_name": pill_name,
+                    })
+                else:
+                    print("No pill detected.")
+                    return jsonify({"error": "No pill detected."}), 400
+
+            except Exception as e:
+                print("Image processing error:", str(e))
+                return jsonify({"error": f"Image processing error: {str(e)}"}), 500
 
         except Exception as e:
-            print(f"Error: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            return jsonify({"error": f"Error: {str(e)}"}), 500
-            
+            print("Internal server error:", str(e))
+            return jsonify({"error": f"Internal server error: {str(e)}"}), 500
     except Exception as e:
         print(f"Server error: {str(e)}")
         return jsonify({
